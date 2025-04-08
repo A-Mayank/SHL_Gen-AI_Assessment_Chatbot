@@ -1,4 +1,9 @@
 import streamlit as st
+st.set_page_config(
+    page_title="SHL Assessment Finder",
+    layout="wide",
+    page_icon="🔍"
+)
 import json
 import numpy as np
 from sentence_transformers import SentenceTransformer, util
@@ -32,11 +37,6 @@ docs, embeddings = load_data()
 # ------------------------------
 # UI Layout
 # ------------------------------
-st.set_page_config(
-    page_title="SHL Assessment Finder",
-    layout="wide",
-    page_icon="🔍"
-)
 
 st.title("🧠 SHL Assessment Recommender")
 st.markdown(
@@ -52,7 +52,6 @@ with col1:
 
 with col2:
     top_k = st.slider("🔢 Top N Results", 1, 10, 5)
-    min_score = st.slider("📈 Minimum Similarity Score", 0.5, 1.0, 0.75, step=0.01)
     filter_remote = st.checkbox("🧪 Remote Testing Only", value=False)
     filter_adaptive = st.checkbox("📊 Adaptive/IRT Only", value=False)
 
@@ -60,7 +59,7 @@ with col2:
 # ------------------------------
 # Helper: Run search
 # ------------------------------
-def find_best_matches(user_query, top_k=5, min_score=0.75):
+def find_best_matches(user_query, top_k=5):
     query_embedding = model.encode(user_query, convert_to_tensor=True)
     scores = util.cos_sim(query_embedding, embeddings)[0].cpu().numpy()
     sorted_indices = scores.argsort()[::-1]
@@ -74,19 +73,11 @@ def find_best_matches(user_query, top_k=5, min_score=0.75):
             continue
         seen.add((doc["name"], doc["url"]))
 
-        score = float(scores[idx])
-        if score < min_score:
-            continue
-        if filter_remote and doc.get("remote_testing", "").lower() != "yes":
-            continue
-        if filter_adaptive and doc.get("adaptive_irt", "").lower() != "yes":
-            continue
-
         results.append(
             {
                 "name": doc["name"],
                 "url": doc["url"],
-                "score": score,
+                "score": float(scores[idx]),
                 "description": doc.get("description", ""),
                 "duration": doc.get("duration", ""),
                 "test_type": doc.get("test_type", ""),
@@ -99,6 +90,7 @@ def find_best_matches(user_query, top_k=5, min_score=0.75):
             break
 
     return results
+
 
 
 # ------------------------------
@@ -114,7 +106,7 @@ if st.button("🔍 Find Recommendations"):
         st.warning("Please enter a query or upload a file.")
     else:
         with st.spinner("Thinking..."):
-            results = find_best_matches(query, top_k=top_k, min_score=min_score)
+            results = find_best_matches(query, top_k=top_k)
 
         if not results:
             st.error("No relevant assessments found.")
